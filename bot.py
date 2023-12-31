@@ -16,7 +16,6 @@ from config import BOT_TOKEN, BUTTONS_TEXTS_AND_CALLBACK_DATAS
 from wildberries import WildBerriesParser
 from ozon import OzonParser
 from yandexmarket import YandexMarketParser
-from async_process_runner import start
 
 dp = Dispatcher()
 

@@ -4,6 +4,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.methods import DeleteWebhook
 
 # импорты других библиотек
 import asyncio
@@ -14,6 +15,8 @@ import sys
 from config import BOT_TOKEN, BUTTONS_TEXTS_AND_CALLBACK_DATAS
 from wildberries import WildBerriesParser
 from ozon import OzonParser
+from yandexmarket import YandexMarketParser
+from async_process_runner import start
 
 dp = Dispatcher()
 
@@ -46,11 +49,13 @@ async def handle_shop(call: types.CallbackQuery) -> None:
         ozon_parser = OzonParser(call)
         await ozon_parser.run_parser(key_words)
     elif call.data == 'yandex_market':
-        await call.answer("В разработке!")
+        ym_parser = YandexMarketParser(call)
+        await ym_parser.run_parser(key_words)
 
 
 async def main() -> None:
     bot = Bot(token=BOT_TOKEN)
+    await bot(DeleteWebhook(drop_pending_updates=True))
     await dp.start_polling(bot)
 
 

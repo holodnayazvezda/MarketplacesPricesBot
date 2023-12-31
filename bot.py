@@ -12,7 +12,8 @@ import sys
 
 # импорты из других файлов
 from config import BOT_TOKEN, BUTTONS_TEXTS_AND_CALLBACK_DATAS
-from main import WildBerriesParser
+from wildberries import WildBerriesParser
+from ozon import OzonParser
 
 dp = Dispatcher()
 
@@ -42,7 +43,8 @@ async def handle_shop(call: types.CallbackQuery) -> None:
         wb_parser = WildBerriesParser(call)
         await wb_parser.run_parser(key_words)
     elif call.data == 'ozon':
-        await call.answer("В разработке!")
+        ozon_parser = OzonParser(call)
+        await ozon_parser.run_parser(key_words)
     elif call.data == 'yandex_market':
         await call.answer("В разработке!")
 

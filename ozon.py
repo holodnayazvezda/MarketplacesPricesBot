@@ -20,7 +20,7 @@ class OzonParser:
 
     async def get_html_of_the_page(self, url: str) -> str:
         if not self.driver:
-            self.driver = Driver(uc=True, headless=True)
+            self.driver = Driver(uc=True, headless=True, incognito=True)
         self.driver.get(url)
         SCROLL_PAUSE_TIME = 2
         last_height = self.driver.execute_script("return document.body.scrollHeight")

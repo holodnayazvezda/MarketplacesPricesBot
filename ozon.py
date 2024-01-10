@@ -8,8 +8,15 @@ import re
 from datetime import datetime as dt
 
 
+def get_div_after_a_tag(a):
+    try:
+        return a.find_next_sibling("div")
+    except Exception:
+        return None
+
+
 class OzonParser:
-    def __init__(self, aiogram_call: CallbackQuery):
+    def __init__(self, aiogram_call: CallbackQuery = None):
         self.key_word = ''
         self.key_words = []
         self.full_prices_list = {}
@@ -20,7 +27,7 @@ class OzonParser:
 
     async def get_html_of_the_page(self, url: str) -> str:
         if not self.driver:
-            self.driver = Driver(uc=True, headless=True, agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0')
+            self.driver = Driver(uc=True, headless=True)
         self.driver.get(url)
         SCROLL_PAUSE_TIME = 2
         last_height = self.driver.execute_script("return document.body.scrollHeight")
@@ -30,13 +37,13 @@ class OzonParser:
             new_height = self.driver.execute_script("return document.body.scrollHeight")
             if new_height == last_height:
                 break
-            last_height = new_height    
+            last_height = new_height
         page_html = str(self.driver.page_source)
         return page_html
 
     async def parse_amount_of_pages(self, html: str) -> dict:
         soup = BeautifulSoup(html, "html.parser")
-        try: 
+        try:
             s = list(map(lambda el: (int(el.getText()), 'https://ozon.ru' + el.get('href')), soup.find('div', class_='pe9').find('div', class_='eq0').find('div', class_='pe3').find('div', class_='p3e').find('div', class_='').find_all('a', class_='p1e')))
         except Exception:
             return {1: (True, html)}
@@ -49,38 +56,41 @@ class OzonParser:
             self.driver.quit()
             self.driver = None
             return {1: (True, html)}
-    
+
     async def parse_page_content(self, html: str) -> None:
         soup = BeautifulSoup(html, "html.parser")
-        products_blocks = list(map(lambda el: el.find('div', class_='i7w'), soup.find('div', id='paginatorContent').find('div', class_='widget-search-result-container y8i').find('div', class_='iy9').find_all('div', class_='i6w iw7')))
+        products_blocks = list(filter(lambda el: el, list(map(lambda el: get_div_after_a_tag(el.find('a')), soup.find('div', id='paginatorContent').find('div').find('div').find_all('div')))))
         for product_block in products_blocks:
-            full_name = product_block.find('a', class_='tile-hover-target i3t it4').find('div', class_='b8a ac ac0 i3t').find('span', class_='tsBody500Medium').getText().strip()
-            link = 'https://ozon.ru' + product_block.find('a', class_='tile-hover-target i3t it4').get('href')
-            words = full_name.lower().replace('"', '').split()
-            list_of_words = []
-            for word in words:
-                list_of_words += word.split('-')
-            flag = True
-            for key_word in self.key_words:
-                if key_word not in list_of_words:
-                    flag = False
-                    break
-            if not flag:
-                continue
-            prices = list(map(lambda el: int(re.sub(r'[^\x00-\x7f]', '', el.text)), product_block.find('div', class_='i3t').find('div', class_='c3124-a0').find_all('span')[:2]))
-            full_price, discount_price = max(prices), min(prices)
-            if self.discount_prices_list:
-                middle_discount_price = int(sum(self.discount_prices_list) / len(self.discount_prices_list))
-            else:
-                middle_discount_price = 0
-            if middle_discount_price and discount_price + 0.51 * middle_discount_price < middle_discount_price:
-                continue
-            if full_price:
-                self.full_prices_list[full_price] = link
-            if discount_price:
-                self.discount_prices_list[discount_price] = link
-            if full_price - discount_price:
-                self.discounts_list[full_price - discount_price] = link
+            try:
+                full_name = product_block.find('a').find('span', class_='tsBody500Medium').getText().strip()
+                link = 'https://ozon.ru' + product_block.find('a', class_='tile-hover-target').get('href')
+                words = full_name.lower().replace('"', '').split()
+                list_of_words = []
+                for word in words:
+                    list_of_words += word.split('-')
+                flag = True
+                for key_word in self.key_words:
+                    if key_word not in list_of_words:
+                        flag = False
+                        break
+                if not flag:
+                    continue
+                prices = list(map(lambda el: int(re.sub(r'[^\x00-\x7f]', '', el.text)), product_block.find('div').find('div').find_all('span')[:2]))
+                full_price, discount_price = max(prices), min(prices)
+                if self.discount_prices_list:
+                    middle_discount_price = int(sum(self.discount_prices_list) / len(self.discount_prices_list))
+                else:
+                    middle_discount_price = 0
+                if middle_discount_price and discount_price + 0.51 * middle_discount_price < middle_discount_price:
+                    continue
+                if full_price:
+                    self.full_prices_list[full_price] = link
+                if discount_price:
+                    self.discount_prices_list[discount_price] = link
+                if full_price - discount_price:
+                    self.discounts_list[full_price - discount_price] = link
+            except Exception:
+                pass
     
     async def run_parser(self, key_word=None):
         if not key_word:
@@ -95,7 +105,7 @@ class OzonParser:
                 await self.aiogram_call.message.edit_text(text=f"🔗 Загружаю товары со страниц!")
             pages_info = await self.parse_amount_of_pages(await self.get_html_of_the_page(search_url))
         except Exception:
-            print(f'Неудалось получить информацию о товаре {self.key_word} :(')
+            print(f'Не удалось получить информацию о товаре {self.key_word} :(')
             return
         for page_num in pages_info:
             if not pages_info[page_num][0]:
@@ -110,7 +120,10 @@ class OzonParser:
         for page_num in pages_info:
             if pages_info[page_num][0]:
                 page_html = pages_info[page_num][1]
-                await self.parse_page_content(page_html)
+                try:
+                    await self.parse_page_content(page_html)
+                except ImportError:
+                    pass
         time = dt.now().strftime("%Y-%m-%d %H:%M")
         if not self.aiogram_call:
             print(f'На момент времени: {time}')
@@ -138,17 +151,19 @@ class OzonParser:
                 print(f'🟠 Средняя скидка: {middle_discount}')
                 print(f'🔴 Минимальная скидка: {min_discount}')
         elif len(self.discount_prices_list) == 1:
+            discount_price, full_price, discount = list(self.discount_prices_list.keys())[0], list(self.full_prices_list.keys())[0], list(self.discounts_list.keys())[0]
+            link = self.discount_prices_list[discount_price]
             if self.aiogram_call:
                 await self.aiogram_call.message.answer(
-                    text=f'В базе данных был сохранен только 1 товар\n\n🟢 скидочная цена (цена продажи): {self.discount_prices_list[0]}\n🔴 Полная цена: {self.full_prices_list[0]}\n🟠 Cкидка: {self.discounts_list[0]}',
+                    text=f'В базе данных был сохранен только 1 [товар\n\n🟢 скидочная цена (цена продажи): {discount_price}\n🔴 Полная цена: {full_price}\n🟠 Cкидка: {discount}]({link})',
                     parse_mode='markdown'
                 )
                 await self.aiogram_call.message.delete()
             else:
                 print('ℹ️ В базе данных был сохранен только 1 товар')
-                print(f'🟢 Скидочная цена (цена продажи): {self.discount_prices_list[0]}')
-                print(f'🔴 Полная цена: {self.full_prices_list[0]}')
-                print(f'🟠 Cкидка: {self.discounts_list[0]}')
+                print(f'🟢 Скидочная цена (цена продажи): {discount_price}')
+                print(f'🔴 Полная цена: {full_price}')
+                print(f'🟠 Cкидка: {discount}')
         else:
             if self.aiogram_call:
                 await self.aiogram_call.message.answer(
@@ -161,5 +176,5 @@ class OzonParser:
 
 
 if __name__ == '__main__':
-    parser = OzonParser(None)
+    parser = OzonParser()
     asyncio.run(parser.run_parser())

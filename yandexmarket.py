@@ -55,8 +55,11 @@ class YandexMarketParser:
         for products_block in products_blocks:
             if int(products_block.get("data-index")) > 0:
                 try:
+
                     link = 'https://market.yandex.ru' + products_block.find('article').find('a').get('href')
+                    # print(link)
                     full_name = products_block.find('div', class_='_1GfBD').find('h3').find('a').find('span').get_text().strip()
+                    # print(full_name)
                     words = full_name.lower().replace('"', '').split()
                     list_of_words = []
                     for word in words:
@@ -68,7 +71,11 @@ class YandexMarketParser:
                             break
                     if not flag or ('матрац' in words and 'к' in words):
                         continue
-                    prices = list(map(int, list(filter(lambda el: el.isdigit(), list(map(lambda el: re.sub(r'[^\x00-\x7f]', '', el.get_text().strip().replace(" ", '')), products_block.find('div', class_='UZf17').find('div', class_='_2p_cb').find('a').find_all('span')))))))
+                    prices_html_block = products_block.find('div', class_='UZf17').find('div', class_='_2p_cb').find('a')
+                    prices_in_span_tag = prices_html_block.find_all('span')
+                    prices_in_h3_tag = prices_html_block.find_all('h3')
+                    prices_in_all_tags = prices_in_span_tag + prices_in_h3_tag
+                    prices = list(map(int, list(filter(lambda el: el.isdigit(), list(map(lambda el: re.sub(r'[^\x00-\x7f]', '', el.get_text().strip().replace(' ', '').replace(':', '')), prices_in_all_tags))))))
                     full_price, discount_price = max(prices), min(prices)
                     if self.discount_prices_list:
                         middle_discount_price = int(sum(self.discount_prices_list) / len(self.discount_prices_list))
@@ -133,27 +140,29 @@ class YandexMarketParser:
                 )
                 await self.aiogram_call.message.delete()
             else:
-                print(f'❌ Максимальная скидочная цена (цена продажи): {max_discount_price}') 
-                print(f'🔶 Средняя скидочная цена (цена продажи): {middle_discount_price}')  
+                print(f'❌ Максимальная скидочная цена (цена продажи): {max_discount_price}')
+                print(f'🔶 Средняя скидочная цена (цена продажи): {middle_discount_price}')
                 print(f'✅ Минимальная скидочная цена (цена продажи): {min_discount_price}')
-                print(f'🟥 Максимальная полная цена: {max_full_price}') 
+                print(f'🟥 Максимальная полная цена: {max_full_price}')
                 print(f'🟧 Средняя полная цена: {middle_full_price}')
-                print(f'🟩 Минимальная полная цена: {min_full_price}')            
+                print(f'🟩 Минимальная полная цена: {min_full_price}')
                 print(f'🟢 Максимальая скидка: {max_discount}')
                 print(f'🟠 Средняя скидка: {middle_discount}')
                 print(f'🔴 Минимальная скидка: {min_discount}')
         elif len(self.discount_prices_list) == 1:
+            discount_price, full_price, discount = list(self.discount_prices_list.keys())[0], list(self.full_prices_list.keys())[0], list(self.discounts_list.keys())[0]
+            link = self.discount_prices_list[discount_price]
             if self.aiogram_call:
                 await self.aiogram_call.message.answer(
-                    text=f'В базе данных был сохранен только 1 товар\n\n🟢 скидочная цена (цена продажи): {list(self.discount_prices_list.keys())[0]}\n🔴 Полная цена: {list(self.full_prices_list.keys())[0]}\n🟠 Cкидка: {list(self.discounts_list.keys())[0]}',
+                    text=f'В базе данных был сохранен только 1 [товар\n\n🟢 скидочная цена (цена продажи): {discount_price}\n🔴 Полная цена: {full_price}\n🟠 Cкидка: {discount}]({link})',
                     parse_mode='markdown'
                 )
                 await self.aiogram_call.message.delete()
             else:
                 print('ℹ️ В базе данных был сохранен только 1 товар')
-                print(f'🟢 Скидочная цена (цена продажи): {list(self.discount_prices_list.keys())[0]}')
-                print(f'🔴 Полная цена: {list(self.full_prices_list.keys())[0]}')
-                print(f'🟠 Cкидка: {list(self.discounts_list.keys())[0]}')
+                print(f'🟢 Скидочная цена (цена продажи): {discount_price}')
+                print(f'🔴 Полная цена: {full_price}')
+                print(f'🟠 Cкидка: {discount}')
         else:
             if self.aiogram_call:
                 await self.aiogram_call.message.answer(
@@ -166,6 +175,6 @@ class YandexMarketParser:
 
 
 
-# if __name__ == '__main__':
-#     ym_parser = YandexMarketParser(None)
-#     asyncio.run(ym_parser.run_parser('витафон т'))
+if __name__ == '__main__':
+    ym_parser = YandexMarketParser(None)
+    asyncio.run(ym_parser.run_parser('витафон 5'))

@@ -1,20 +1,19 @@
 # импорты aiogram 
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
-from aiogram.types import Message
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.methods import DeleteWebhook
-
 # импорты других библиотек
 import asyncio
 import logging
 import sys
 
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import CommandStart
+from aiogram.methods import DeleteWebhook
+from aiogram.types import Message
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 # импорты из других файлов
-from config import BOT_TOKEN, BUTTONS_TEXTS_AND_CALLBACK_DATAS
-from wildberries import WildBerriesParser
+from config import BOT_TOKEN, TEST_BOT_TOKEN, BUTTONS_TEXTS_AND_CALLBACK_DATAS
 from ozon import OzonParser
+from wildberries import WildBerriesParser
 from yandexmarket import YandexMarketParser
 
 dp = Dispatcher()

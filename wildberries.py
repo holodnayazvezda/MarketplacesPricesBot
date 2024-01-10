@@ -312,7 +312,10 @@ class WildBerriesParser:
         for word in key_word.lower().split():
             self.key_words += word.split('-')
         await self.get_all_products_in_search_result(key_word)
-        await self.get_sales_data()
+        try:
+            await self.get_sales_data()
+        except Exception:
+            pass
         table_path = self.save_to_excel(key_word)
         table_aiogram = FSInputFile(path=table_path)
         time = dt.now().strftime("%Y-%m-%d %H:%M")
@@ -344,19 +347,20 @@ class WildBerriesParser:
                 print(f'🔴 Минимальная скидка: {min_discount}')
                 print(f"Данные по каждому товару сохранены в {table_path} :)") 
         elif len(self.discount_prices_list) == 1:
+            discount_price, full_price, discount = list(self.discount_prices_list.keys())[0], list(self.full_prices_list.keys())[0], list(self.discounts_list.keys())[0]
+            link = self.discount_prices_list[discount_price]
             if self.aiogram_call:
                 await self.aiogram_call.message.answer_document(
                     document=table_aiogram,
-                    caption=f'В базе данных был сохранен только 1 товар\n\n🟢 скидочная цена (цена продажи): {self.discount_prices_list[0]}\n🔴 Полная цена: {self.full_prices_list[0]}\n🟠 Cкидка: {self.discounts_list[0]}',
+                    caption=f'В базе данных был сохранен только 1 [товар\n\n🟢 скидочная цена (цена продажи): {discount_price}\n🔴 Полная цена: {full_price}\n🟠 Cкидка: {discount}]({link})',
                     parse_mode='markdown'
                 )
                 await self.aiogram_call.message.delete()
             else:
                 print('ℹ️ В базе данных был сохранен только 1 товар')
-                print(f'🟢 Скидочная цена (цена продажи): {self.discount_prices_list[0]}')
-                print(f'🔴 Полная цена: {self.full_prices_list[0]}')
-                print(f'🟠 Cкидка: {self.discounts_list[0]}')
-                print(f"Данные по товару сохранены в {table_path} :)")
+                print(f'🟢 Скидочная цена (цена продажи): {discount_price}')
+                print(f'🔴 Полная цена: {full_price}')
+                print(f'🟠 Cкидка: {discount}')
         else:
             if self.aiogram_call:
                 await self.aiogram_call.message.answer(

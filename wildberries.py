@@ -47,44 +47,18 @@ and requires an active internet connection to function properly.
 
 """
 
-
-import json
+import asyncio
 from datetime import date
+from datetime import datetime as dt
 from os import path, remove
-
 
 import pandas as pd
 import requests
-from datetime import datetime as dt
 from aiogram.types import CallbackQuery, FSInputFile
-import asyncio
 
 
 class WildBerriesParser:
-    """
-    A parser object for extracting data from wildberries.ru.
-
-    Attributes:
-        headers (dict): HTTP headers for the parser.
-        run_date (datetime.date): The date when the parser is run.
-        product_cards (list): A list to store the parsed product cards.
-        directory (str): The directory path where the script is located.
-    """
-
     def __init__(self, aiogram_call: CallbackQuery) -> None:
-        """
-        Initialize a new instance of the WildBerriesParser class.
-
-        This constructor sets up the parser object with default values
-        for its attributes.
-
-        Args:
-            None
-
-        Returns:
-            None
-        """
-
         self.headers = {'Accept': "*/*",
                         'User-Agent': "Chrome/51.0.2704.103 Safari/537.36"}
         self.run_date = date.today()
@@ -97,50 +71,12 @@ class WildBerriesParser:
         self.aiogram_call = aiogram_call
 
     def extract_category_data(self, catalogue: list, user_input: str) -> tuple:
-        """
-        Extract category data from the processed catalogue.
-
-        This function searches for a matching category based
-        on the user input, which can be either a URL or a category name.
-        If a match is found, it returns a tuple containing the category name,
-        shard, and query.
-
-        Args:
-            catalogue (list): The processed catalogue as a list
-              of dictionaries.
-            user_input (str): The user input, which can be a URL
-              or a category name.
-
-        Returns:
-            tuple: A tuple containing the category name, shard, and query.
-        """
-
         for category in catalogue:
             if (user_input.split("https://www.wildberries.ru")[-1]
                     == category['url'] or user_input == category['name']):
                 return category['name'], category['shard'], category['query']
 
     def get_products_on_page(self, page_data: dict) -> list[dict]:
-        """
-        Parse one page of results and return a list with product data.
-
-        This function takes a dictionary containing the data of a page from
-        wildberries.ru, specifically the 'data' key with a list of 'products'.
-        It iterates over each item in the 'products' list and extracts
-        relevant information to create a dictionary representing a product.
-        The dictionaries are then appended to the 'products_on_page' list.
-
-        Args:
-            page_data (dict): A dictionary containing the data
-              of a page from wildberries.ru.
-
-        Returns:
-            list: A list of dictionaries representing the products
-              on the page, where each dictionary contains information
-              such as the link, article number, name, brand, price, discounted
-              price, rating, and number of reviews.
-        """
-
         products_on_page = []
         if not page_data:
             return
@@ -163,10 +99,10 @@ class WildBerriesParser:
                 'Ссылка': link,
                 'Артикул': item['id'],
                 'Наименование': item['name'],
-                'Бренд': item['brand'],
-                'ID бренда': item['brandId'],
+                'Продавец': item['supplier'],
                 'Цена': full_price,
                 'Цена со скидкой': discount_price,
+                'Размер скидки': full_price - discount_price,
                 'Рейтинг': item['rating'],
                 'Отзывы': item['feedbacks']
             })
@@ -179,25 +115,6 @@ class WildBerriesParser:
         return products_on_page
 
     def add_data_from_page(self, url: str):
-        """
-        Add data on products from a page to the class's list.
-
-        This function makes a GET request to the specified URL using
-        the provided headers, expecting a JSON response. The page data is then
-        passed to the get_products_on_page method to extract the relevant
-        product information. If there are products on the page,
-        they are appended to the product_cards list in the class,
-        and the number of added products is printed. If there are no products
-        on the page, it prints a message and returns True to indicate the end
-        of product loading.
-
-        Args:
-            url (str): The URL of the page to retrieve the product data from.
-
-        Returns:
-            bool or None: Returns True if there are no products on the page,
-              indicating the end of product loading. Otherwise, returns None.
-        """
         try:
             response = requests.get(url, headers=self.headers).json()
             page_data = self.get_products_on_page(response)
@@ -209,19 +126,6 @@ class WildBerriesParser:
             return
 
     async def get_sales_data(self):
-        """
-        Parse additional sales data for the product cards.
-
-        This function iterates over each product card in the product_cards
-        list and makes a request to retrieve the sales data for the
-        corresponding product. The sales data is then added to the product
-        card dictionary with the key 'Продано'. If an exception occurs during
-        the request, indicating a connection timeout, the sales data is set to
-        'нет данных'. Progress information is printed during the iteration.
-
-        Returns:
-            None
-        """
         if self.aiogram_call:
             await self.aiogram_call.message.edit_text(text=f"⚪️ Обрабатываю товары!")
 
@@ -237,20 +141,6 @@ class WildBerriesParser:
                 print(f"Обрабатываю товар: {self.product_cards.index(card) + 1} из {len(self.product_cards)}")
 
     def save_to_excel(self, file_name: str) -> str:
-        """
-        Save the parsed data in xlsx format and return its path.
-
-        This function takes the parsed data stored in the product_cards list
-        and converts it into a Pandas DataFrame. It then saves the DataFrame
-        as an xlsx file with the specified file name and the current run date
-        appended to it. The resulting file path is returned.
-
-        Args:
-            file_name (str): The desired file name for the saved xlsx file.
-
-        Returns:
-            str: The path of the saved xlsx file.
-        """
         data = pd.DataFrame(self.product_cards)
         result_path = (f"{path.join(self.directory, file_name)}_"
                        f"{self.run_date.strftime('%Y-%m-%d')}.xlsx")
@@ -260,23 +150,6 @@ class WildBerriesParser:
         return result_path
 
     async def get_all_products_in_search_result(self, key_word: str):
-        """
-        Retrieve all products in the search result by going through all pages.
-
-        This function iterates over page numbers from 1 to 100, constructing
-        the URL for each page in the search result based on the provided
-        keyword. It then calls the add_data_from_page method to retrieve and
-        add the product data from each page to the class's product_cards list.
-        If the add_data_from_page method returns True, indicating the end of
-        product loading, the loop breaks.
-
-        Args:
-            key_word (str): The keyword to search for in the
-              wildberries.ru search.
-
-        Returns:
-            None
-        """
         if self.aiogram_call:
             await self.aiogram_call.message.edit_text(text=f"🔗 Загружаю товары со страниц!")
 
@@ -291,22 +164,6 @@ class WildBerriesParser:
                 break
 
     async def run_parser(self, key_word=''):
-        """
-        Run the whole script for parsing and data processing.
-
-        This function runs the entire script by prompting the user to choose
-        a parsing mode: either parsing a category entirely or parsing by
-        keywords. Based on the user's choice, it executes the corresponding
-        sequence of steps. For parsing a category, it downloads the current
-        catalogue, processes it, extracts the category data, retrieves all
-        products in the category, collects sales data, and saves the parsed
-        data to an Excel file. For parsing by keywords, it prompts for
-        a search query, retrieves all products in the search result, collects
-        sales data, and saves the parsed data to an Excel file.
-
-        Returns:
-            None
-        """
         if not key_word:
             key_word = input("Введите запрос для поиска: ")
         for word in key_word.lower().split():

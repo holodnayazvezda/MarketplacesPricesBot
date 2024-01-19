@@ -52,7 +52,7 @@ async def handle_shop(call: types.CallbackQuery) -> None:
 
 
 async def main() -> None:
-    bot = Bot(token=BOT_TOKEN)
+    bot = Bot(token=TEST_BOT_TOKEN)
     await bot(DeleteWebhook(drop_pending_updates=True))
     await dp.start_polling(bot)
 
